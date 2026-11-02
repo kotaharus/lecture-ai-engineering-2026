@@ -1,0 +1,68 @@
+{
+  "known": [
+    {
+      "question": "LoRAとは何ですか？",
+      "term_id": "lora"
+    },
+    {
+      "question": "PEFTとは何ですか？",
+      "term_id": "peft"
+    },
+    {
+      "question": "ファインチューニングとは何ですか？",
+      "term_id": "fine-tuning"
+    },
+    {
+      "question": "過学習とは何ですか？",
+      "term_id": "overfitting"
+    },
+    {
+      "question": "量子化とは何ですか？",
+      "term_id": "quantization"
+    }
+  ],
+  "paraphrase": [
+    {
+      "question": "LoRAが更新する重みと固定する重みの違いを説明してください。",
+      "term_id": "lora"
+    },
+    {
+      "question": "モデルの一部のパラメータだけを学習する方法の総称は何ですか？",
+      "term_id": "peft"
+    },
+    {
+      "question": "既存のLLMを特定の用途に適応させるには、どのような追加学習を行いますか？",
+      "term_id": "fine-tuning"
+    },
+    {
+      "question": "訓練データでは良い結果なのに、初めて見る質問で性能が落ちるのはなぜですか？",
+      "term_id": "overfitting"
+    },
+    {
+      "question": "モデルの重みを少ないビット数で表現する目的は何ですか？",
+      "term_id": "quantization"
+    }
+  ],
+  "unknown": [
+    {
+      "question": "この講座の第14回で扱う技術は何ですか？",
+      "expected": "用語集に根拠なし"
+    },
+    {
+      "question": "2027年度のAIE講座の担当教員は誰ですか？",
+      "expected": "用語集に根拠なし"
+    },
+    {
+      "question": "来年度の宿題提出期限はいつですか？",
+      "expected": "用語集に根拠なし"
+    },
+    {
+      "question": "次回の講義のZoomパスコードを教えてください。",
+      "expected": "用語集に根拠なし"
+    },
+    {
+      "question": "2028年版の公式用語集には何語登録されますか？",
+      "expected": "用語集に根拠なし"
+    }
+  ]
+}
