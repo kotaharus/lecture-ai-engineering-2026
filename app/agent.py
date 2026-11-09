@@ -38,23 +38,34 @@ INSTRUCTIONS = """\
 - 用語集に見つからないことは、推測で断定せず「用語集にはない」と伝える。
 - 回答の最後に、関係する回（第N回）を示す。
 - 宿題の答えそのものは書かず、考え方のヒントで導く。
-- 学習記録の保存を頼まれた場合は save_learning_log を使う。
 """
 
 # モデルは実行時に渡す（テストではAPIを呼ばない TestModel に差し替えるため）
 # change in lec03 基礎
-# agent = Agent(instructions=INSTRUCTIONS)
-agent = Agent(
-    instructions=INSTRUCTIONS,
-    output_type=[str, DeferredToolRequests],
-)
-
-
+agent = Agent(instructions=INSTRUCTIONS)
 agent.tool_plain(tools.search_glossary)
 agent.tool_plain(tools.get_lecture_summary)
 agent.tool_plain(tools.make_quiz) # add in lec03
+
+# add in lec03 発展
+# 承認付き保存が可能なエージェント（CLI用）
+saving_agent = Agent(
+    instructions=INSTRUCTIONS
+    + "\n- 学習記録の保存を頼まれた場合は save_learning_log を使う。",
+    output_type=[str, DeferredToolRequests],
+)
+
+saving_agent.tool_plain(tools.search_glossary)
+saving_agent.tool_plain(tools.get_lecture_summary)
+saving_agent.tool_plain(tools.make_quiz)
+saving_agent.tool_plain(
+    tools.save_learning_log,
+    requires_approval=True,
+)
+
+
 # add in lec03 基礎
-agent.tool_plain(tools.save_learning_log, requires_approval=True)
+# agent.tool_plain(tools.save_learning_log, requires_approval=True)
 
 # TODO(第3回 演習): tools.py に make_quiz を作り、ここで登録しよう
 
@@ -131,7 +142,9 @@ def main() -> None:
     parser.add_argument("--list-tools", action="store_true", help="モデルに見えるツール一覧を表示して終了する（APIキー不要）")
     args = parser.parse_args()
 
-    target = build_mcp_agent() if args.mcp else agent
+    # change in lec03
+    # target = build_mcp_agent() if args.mcp else agent
+    target = build_mcp_agent() if args.mcp else saving_agent
     if args.list_tools:
         print_tools(target)
         return
