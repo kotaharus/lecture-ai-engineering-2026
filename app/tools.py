@@ -5,6 +5,9 @@
 """
 
 import json
+import random # add in lec03
+from datetime import datetime, timezone # add in lec03 基礎
+from uuid import uuid4 # add in lec03 基礎
 from functools import cache
 from pathlib import Path
 
@@ -29,10 +32,13 @@ def _names(entry: dict) -> list[str]:
 
 
 def search_glossary(query: str) -> str:
+    # Lec03 基礎　答える前に使うこと〜3行
     """講座の用語集から用語を検索し、定義と、どの回で扱うかを返す。
 
     AIエンジニアリングの用語や、この講座（AIE2026）に固有の言葉について
-    答える前に使うこと。query には調べたい用語を1つだけ入れる（例: "LoRA"）。
+    答える前に使うこと。比較対象が複数ある場合は、
+    それらを1つのqueryにまとめて入れる（例: "LoRAとQLoRA"）。
+    単独の用語も指定できる。
     """
     q = _normalize(query)
     if not q:
@@ -77,3 +83,75 @@ def get_lecture_summary(lecture: int) -> str:
         available = sorted(p.stem for p in (DATA_DIR / "lectures").glob("*.md"))
         return f"第{lecture}回の要点はまだありません。用意されている回: {', '.join(available)}"
     return path.read_text(encoding="utf-8")
+
+
+def make_quiz(lecture: int) -> str:
+    """指定した回の用語集から1つ選び、確認問題と答えを返す。
+
+    「第2回の確認問題を出して」のように、
+    特定の回の復習問題を求められたときに使う。
+    lectureには回数を整数で指定する。
+    """
+    glossary = load_glossary()
+
+    # 指定された回の用語だけを抽出
+    terms = [
+        entry for entry in glossary
+        if entry["lecture"] == lecture
+    ]
+
+    # 存在しない回が指定された場合
+    if not terms:
+        return f"第{lecture}回に対応する用語が見つかりません。"
+
+    # 用語をランダムに1つ選択
+    selected = random.choice(terms)
+
+    # 問題と答えをJSON形式で返す
+    return json.dumps(
+        {
+            "question": f"「{selected['term']}」の意味は？",
+            "answer": selected["definition"],
+        },
+        ensure_ascii=False,
+    )
+
+# add in lec03 基礎
+def save_learning_log(topic: str, content: str) -> str:
+    """学習記録をlearning_logフォルダに保存する。
+
+    利用者が学習した内容を記録・保存してほしいと
+    明確に依頼した場合に使う。
+    topicは学習テーマ、contentは学習内容を指定する。
+    保存には利用者の承認が必要。
+    """
+    # 空の記録を保存しない
+    if not topic.strip() or not content.strip():
+        return "学習テーマと内容の両方を指定してください。"
+
+    # 保存先のフォルダ
+    log_dir = Path(__file__).resolve().parent.parent / "learning_log"
+    log_dir.mkdir(parents=True, exist_ok=True)
+
+    # 保存日時と重複しにくいファイル名を生成
+    timestamp = datetime.now(timezone.utc)
+    filename = (
+        f"{timestamp.strftime('%Y%m%dT%H%M%SZ')}_"
+        f"{uuid4().hex[:8]}.json"
+    )
+    path = log_dir / filename
+
+    # 保存するデータ
+    record = {
+        "created_at": timestamp.isoformat(),
+        "topic": topic,
+        "content": content,
+    }
+
+    # JSONファイルとして保存
+    path.write_text(
+        json.dumps(record, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+    return f"学習記録を保存しました: {path}"
