@@ -12,11 +12,13 @@
 """
 
 import argparse
-import inspect
+import inspect # add in Lec03
 import json
 from pathlib import Path
 
-from pydantic_ai import Agent
+# change in Lec03 基礎
+# from pydantic_ai import Agent
+from pydantic_ai import Agent, DeferredToolRequests, DeferredToolResults
 from pydantic_ai.exceptions import ModelHTTPError
 from fastmcp import Client
 from pydantic_ai.mcp import MCPToolset, StdioTransport
@@ -28,6 +30,7 @@ from pydantic_ai.providers.google import GoogleProvider
 from app import tools
 from app.config import MODEL, api_error_message, get_api_key
 
+# add the last in lec03 基礎
 INSTRUCTIONS = """\
 あなたはAIエンジニアリング講座（AIE2026）の学習支援エージェントです。
 - 用語や講座に固有のことを答える前に、必ず search_glossary で用語集を確認する。
@@ -38,9 +41,31 @@ INSTRUCTIONS = """\
 """
 
 # モデルは実行時に渡す（テストではAPIを呼ばない TestModel に差し替えるため）
+# change in lec03 基礎
 agent = Agent(instructions=INSTRUCTIONS)
 agent.tool_plain(tools.search_glossary)
 agent.tool_plain(tools.get_lecture_summary)
+agent.tool_plain(tools.make_quiz) # add in lec03
+
+# add in lec03 発展
+# 承認付き保存が可能なエージェント（CLI用）
+saving_agent = Agent(
+    instructions=INSTRUCTIONS
+    + "\n- 学習記録の保存を頼まれた場合は save_learning_log を使う。",
+    output_type=[str, DeferredToolRequests],
+)
+
+saving_agent.tool_plain(tools.search_glossary)
+saving_agent.tool_plain(tools.get_lecture_summary)
+saving_agent.tool_plain(tools.make_quiz)
+saving_agent.tool_plain(
+    tools.save_learning_log,
+    requires_approval=True,
+)
+
+
+# add in lec03 基礎
+# agent.tool_plain(tools.save_learning_log, requires_approval=True)
 
 # TODO(第3回 演習): tools.py に make_quiz を作り、ここで登録しよう
 
@@ -117,7 +142,9 @@ def main() -> None:
     parser.add_argument("--list-tools", action="store_true", help="モデルに見えるツール一覧を表示して終了する（APIキー不要）")
     args = parser.parse_args()
 
-    target = build_mcp_agent() if args.mcp else agent
+    # change in lec03
+    # target = build_mcp_agent() if args.mcp else agent
+    target = build_mcp_agent() if args.mcp else saving_agent
     if args.list_tools:
         print_tools(target)
         return
@@ -127,15 +154,49 @@ def main() -> None:
     print(f"[model] {MODEL}")
     if args.mcp:
         print("[tools] MCP サーバー（app/mcp_servers.json）")
+
+    # change in lec03 基礎
+    # try:
+    #     result = target.run_sync(args.question, model=build_model())
+    # except ModelHTTPError as e:
+    #     print(api_error_message(e.status_code, str(e.body)[:200]))
+    #     raise SystemExit(1)
+    # print(result.output)
+    # if args.trace:
+    #     print_trace(result)
+
     try:
         result = target.run_sync(args.question, model=build_model())
+
+        # 承認待ちのツール呼び出しを処理
+        while isinstance(result.output, DeferredToolRequests):
+            pending = result.output
+            approvals = DeferredToolResults()
+
+            for call in pending.approvals:
+                print(f"\n[承認待ち] {call.tool_name}")
+                print(f"引数: {call.args}")
+
+                answer = input("実行を許可しますか？ [y/N]: ")
+                approved = answer.strip().lower() in ("y", "yes")
+
+                approvals.approvals[call.tool_call_id] = approved
+                print("[承認]" if approved else "[拒否]")
+
+            # 承認結果を渡してエージェントを再開
+            result = target.run_sync(
+                message_history=result.all_messages(),
+                deferred_tool_results=approvals,
+                model=build_model(),
+            )
+
     except ModelHTTPError as e:
         print(api_error_message(e.status_code, str(e.body)[:200]))
         raise SystemExit(1)
+
     print(result.output)
     if args.trace:
         print_trace(result)
-
 
 if __name__ == "__main__":
     main()
