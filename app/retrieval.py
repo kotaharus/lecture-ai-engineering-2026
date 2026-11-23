@@ -3,6 +3,7 @@
 import argparse
 import json
 import math
+import os
 import re
 import sqlite3
 from contextlib import contextmanager
@@ -138,6 +139,35 @@ def search(query: str) -> list[dict]:
         return [dict(row) for row in rows]
 
 
+def search_with_neighbors(query: str) -> list[dict]:
+    """検索上位ページに、同一資料内の前後1ページを重複なく追加する。"""
+    hits = search(query)
+    page_lookup = {
+        (p["document_id"], p["page"]): p
+        for p in load_pages()
+    }
+
+    results = list(hits)
+    seen = {hit["page_id"] for hit in hits}
+
+    for hit in hits:
+        for offset in (-1, 1):
+            neighbor = page_lookup.get(
+                (hit["document_id"], hit["page"] + offset)
+            )
+            if neighbor is None or neighbor["page_id"] in seen:
+                continue
+
+            results.append({
+                **neighbor,
+                "retrieval_source": "neighbor",
+                "neighbor_of": hit["page_id"],
+            })
+            seen.add(neighbor["page_id"])
+
+    return results
+
+
 def search_graph(query: str) -> dict:
     """ベクトル検索を入口に、前後ページと共通用語で候補を広げる。"""
     pages = {page["page_id"]: page for page in load_pages(RAG_SOURCE)}
@@ -181,9 +211,21 @@ def search_graph(query: str) -> dict:
                 if neighbor not in candidates or priority < candidates[neighbor][0]:
                     candidates[neighbor] = (priority, candidate)
     expanded = [candidate for _, candidate in sorted(candidates.values())]
-    return {"seeds": results, "expanded": expanded[:max(0, GRAPH_MAX_RESULTS - len(results))],
-            "max_hops": GRAPH_HOPS}
 
+    selected_hops = GRAPH_HOPS
+
+    if os.getenv("AIE_GRAPH_ADAPTIVE_HOPS") == "1":
+        one_hop = [page for page in expanded if page["hops"] <= 1]
+
+        if len(results) + len(one_hop) >= 6:
+            expanded = one_hop
+            selected_hops = 1
+
+    return {
+        "seeds": results,
+        "expanded": expanded[:max(0, GRAPH_MAX_RESULTS - len(results))],
+        "max_hops": selected_hops,
+    }
 
 
 def run_full_context(agent, question: str, model, instructions: str, prompt_template: str):
